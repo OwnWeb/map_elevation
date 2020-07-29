@@ -1,0 +1,16 @@
+name: map_elevation
+description: A widget to display elevation of a track (polyline) like Leaflet.Elevation.
+version: 1.0.1
+homepage: https://github.com/OwnWeb/map_elevation
+
+environment:
+  sdk: ">=2.7.0 <3.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  latlong: ^0.6.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
