@@ -4,7 +4,7 @@
 
 A widget to display elevation of a track (polyline)
 
-[![Demo screenshot](https://github.com/OwnWeb/blob/master/statics/demo.gif)](https://github.com/OwnWeb/blob/master/statics/demo.gif)
+[![Demo screenshot](https://github.com/OwnWeb/map_elevation/blob/master/statics/demo.gif?raw=true)](https://github.com/OwnWeb/map_elevation/blob/master/statics/demo.gif?raw=true)
 
 ## Features
 - Draw elevation graph
