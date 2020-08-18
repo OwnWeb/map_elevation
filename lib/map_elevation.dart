@@ -11,7 +11,7 @@ import 'package:latlong/latlong.dart' as lg;
 class Elevation extends StatefulWidget {
   /// List of points to draw on elevation widget
   /// Lat and Long are required to emit notification on hover
-  final List<ElevationPoint> points;
+  final List<InfoPoint> points;
 
   /// Background color of the elevation graph
   final Color color;
@@ -44,11 +44,10 @@ class _ElevationState extends State<Elevation> {
           lbPadding: _lbPadding);
       return GestureDetector(
           onHorizontalDragUpdate: (DragUpdateDetails details) {
-            ElevationPoint pointFromPosition = elevationPainter
+            InfoPoint pointFromPosition = elevationPainter
                 .getPointFromPosition(details.globalPosition.dx);
-            if (pointFromPosition is ElevationPoint) {
-              ElevationHoverNotification(pointFromPosition.latLng)
-                ..dispatch(context);
+            if (pointFromPosition is InfoPoint) {
+              InfoHoverNotification(pointFromPosition)..dispatch(context);
               setState(() {
                 _hoverLinePosition = details.globalPosition.dx;
                 _hoveredAltitude = pointFromPosition.altitude;
@@ -56,7 +55,7 @@ class _ElevationState extends State<Elevation> {
             }
           },
           onHorizontalDragEnd: (DragEndDetails details) {
-            ElevationHoverNotification(null)..dispatch(context);
+            InfoHoverNotification(null)..dispatch(context);
             setState(() {
               _hoverLinePosition = null;
             });
@@ -102,7 +101,7 @@ class _ElevationState extends State<Elevation> {
 }
 
 class _ElevationPainter extends CustomPainter {
-  List<ElevationPoint> points;
+  List<InfoPoint> points;
   List<double> _relativeAltitudes;
   Color paintColor;
   Offset lbPadding;
@@ -161,8 +160,7 @@ class _ElevationPainter extends CustomPainter {
     if (elevationGradientColors is ElevationGradientColors) {
       List<Color> gradientColors = [paintColor];
       for (int i = 1; i < points.length; i++) {
-        double dX =
-            lg.Distance().distance(points[i].latLng, points[i - 1].latLng);
+        double dX = lg.Distance().distance(points[i], points[i - 1]);
         double dZ = (points[i].altitude - points[i - 1].altitude);
 
         double gradient = 100 * dZ / dX;
@@ -230,7 +228,7 @@ class _ElevationPainter extends CustomPainter {
   double _getYForAltitude(double altitude, Size size) =>
       size.height - altitude * size.height - lbPadding.dy;
 
-  ElevationPoint getPointFromPosition(double position) {
+  InfoPoint getPointFromPosition(double position) {
     int index = ((position - lbPadding.dx) / widthOffset).round();
 
     if (index >= points.length || index < 0) return null;
@@ -246,11 +244,11 @@ class _ElevationPainter extends CustomPainter {
 }
 
 /// [Notification] emitted when graph is hovered
-class ElevationHoverNotification extends Notification {
-  /// Hovered point coordinates
-  final lg.LatLng position;
+class InfoHoverNotification extends Notification {
+  /// Hovered point
+  final InfoPoint infoPoint;
 
-  ElevationHoverNotification(this.position);
+  InfoHoverNotification(this.infoPoint);
 }
 
 /// Elevation gradient colors
@@ -269,12 +267,10 @@ class ElevationGradientColors {
 }
 
 /// Geographic point with elevation
-class ElevationPoint {
-  /// Latitude and Longitude
-  lg.LatLng latLng;
-
+class InfoPoint extends lg.LatLng {
   /// Altitude (in meters)
   double altitude;
 
-  ElevationPoint(this.latLng, this.altitude);
+  InfoPoint(double latitude, double longitude, this.altitude)
+      : super(latitude, longitude);
 }

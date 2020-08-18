@@ -55,7 +55,7 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  LatLng hoverPoint;
+  InfoPoint hoverPoint;
 
   @override
   Widget build(BuildContext context) {
@@ -114,16 +114,16 @@ class _MyHomePageState extends State<MyHomePage> {
           height: 120,
           child: Container(
             color: Colors.white.withOpacity(0.6),
-            child: NotificationListener<ElevationHoverNotification>(
-                onNotification: (ElevationHoverNotification notification) {
+            child: NotificationListener<InfoHoverNotification>(
+                onNotification: (InfoHoverNotification notification) {
                   setState(() {
-                    hoverPoint = notification.position;
+                    hoverPoint = notification.infoPoint;
                   });
 
                   return true;
                 },
                 child: Elevation(
-                  getElevationPoints(),
+                  getPoints(),
                   color: Colors.grey,
                   elevationGradientColors: ElevationGradientColors(
                       gt10: Colors.green,
