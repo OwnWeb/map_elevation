@@ -117,7 +117,7 @@ class _MyHomePageState extends State<MyHomePage> {
             child: NotificationListener<ElevationHoverNotification>(
                 onNotification: (ElevationHoverNotification notification) {
                   setState(() {
-                    hoverPoint = notification.elevationPoint;
+                    hoverPoint = notification.position;
                   });
 
                   return true;

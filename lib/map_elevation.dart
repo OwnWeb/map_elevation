@@ -246,9 +246,9 @@ class _ElevationPainter extends CustomPainter {
 /// [Notification] emitted when graph is hovered
 class ElevationHoverNotification extends Notification {
   /// Hovered point coordinates
-  final ElevationPoint elevationPoint;
+  final ElevationPoint position;
 
-  ElevationHoverNotification(this.elevationPoint);
+  ElevationHoverNotification(this.position);
 }
 
 /// Elevation gradient colors
@@ -273,4 +273,6 @@ class ElevationPoint extends lg.LatLng {
 
   ElevationPoint(double latitude, double longitude, this.altitude)
       : super(latitude, longitude);
+
+  lg.LatLng get latLng => this;
 }
