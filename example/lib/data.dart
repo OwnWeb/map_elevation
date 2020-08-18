@@ -1126,10 +1126,6 @@ List<List<double>> raw = [
   [5.38825, 45.17357, 208]
 ];
 
-List<LatLng> getPoints() {
-  return raw.map((e) => LatLng(e[1], e[0])).toList();
-}
-
-List<ElevationPoint> getElevationPoints() {
-  return raw.map((e) => ElevationPoint(LatLng(e[1], e[0]), e[2])).toList();
+List<ElevationPoint> getPoints() {
+  return raw.map((e) => ElevationPoint(e[1], e[0], e[2])).toList();
 }
