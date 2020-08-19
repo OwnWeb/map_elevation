@@ -47,8 +47,7 @@ class _ElevationState extends State<Elevation> {
             ElevationPoint pointFromPosition = elevationPainter
                 .getPointFromPosition(details.globalPosition.dx);
             if (pointFromPosition is ElevationPoint) {
-              ElevationHoverNotification(pointFromPosition.latLng)
-                ..dispatch(context);
+              ElevationHoverNotification(pointFromPosition)..dispatch(context);
               setState(() {
                 _hoverLinePosition = details.globalPosition.dx;
                 _hoveredAltitude = pointFromPosition.altitude;
@@ -161,8 +160,7 @@ class _ElevationPainter extends CustomPainter {
     if (elevationGradientColors is ElevationGradientColors) {
       List<Color> gradientColors = [paintColor];
       for (int i = 1; i < points.length; i++) {
-        double dX =
-            lg.Distance().distance(points[i].latLng, points[i - 1].latLng);
+        double dX = lg.Distance().distance(points[i], points[i - 1]);
         double dZ = (points[i].altitude - points[i - 1].altitude);
 
         double gradient = 100 * dZ / dX;
@@ -248,7 +246,7 @@ class _ElevationPainter extends CustomPainter {
 /// [Notification] emitted when graph is hovered
 class ElevationHoverNotification extends Notification {
   /// Hovered point coordinates
-  final lg.LatLng position;
+  final ElevationPoint position;
 
   ElevationHoverNotification(this.position);
 }
@@ -269,12 +267,12 @@ class ElevationGradientColors {
 }
 
 /// Geographic point with elevation
-class ElevationPoint {
-  /// Latitude and Longitude
-  lg.LatLng latLng;
-
+class ElevationPoint extends lg.LatLng {
   /// Altitude (in meters)
   double altitude;
 
-  ElevationPoint(this.latLng, this.altitude);
+  ElevationPoint(double latitude, double longitude, this.altitude)
+      : super(latitude, longitude);
+
+  lg.LatLng get latLng => this;
 }

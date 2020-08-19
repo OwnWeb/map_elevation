@@ -55,7 +55,7 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  LatLng hoverPoint;
+  ElevationPoint hoverPoint;
 
   @override
   Widget build(BuildContext context) {
@@ -123,7 +123,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   return true;
                 },
                 child: Elevation(
-                  getElevationPoints(),
+                  getPoints(),
                   color: Colors.grey,
                   elevationGradientColors: ElevationGradientColors(
                       gt10: Colors.green,

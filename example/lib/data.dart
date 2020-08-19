@@ -1,5 +1,4 @@
 import 'package:map_elevation/map_elevation.dart';
-import 'package:latlong/latlong.dart';
 
 List<List<double>> raw = [
   [5.58213, 45.13065, 1005],
@@ -1126,10 +1125,6 @@ List<List<double>> raw = [
   [5.38825, 45.17357, 208]
 ];
 
-List<LatLng> getPoints() {
-  return raw.map((e) => LatLng(e[1], e[0])).toList();
-}
-
-List<ElevationPoint> getElevationPoints() {
-  return raw.map((e) => ElevationPoint(LatLng(e[1], e[0]), e[2])).toList();
+List<ElevationPoint> getPoints() {
+  return raw.map((e) => ElevationPoint(e[1], e[0], e[2])).toList();
 }
