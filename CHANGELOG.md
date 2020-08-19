@@ -1,3 +1,6 @@
+## [1.1.0]
+* Make ElevationPoint extends LatLng @moovida
+
 ## [1.0.2]
 * Update README
 
