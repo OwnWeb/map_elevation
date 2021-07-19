@@ -5,7 +5,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
-import 'package:latlong/latlong.dart' as lg;
+import 'package:latlong2/latlong.dart' as lg;
 
 /// Elevation statefull widget
 class Elevation extends StatefulWidget {
