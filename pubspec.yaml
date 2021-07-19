@@ -1,6 +1,6 @@
 name: map_elevation
 description: A widget to display elevation of a track (polyline) like Leaflet.Elevation.
-version: 1.1.0
+version: 1.2.0
 homepage: https://github.com/OwnWeb/map_elevation
 
 environment:
