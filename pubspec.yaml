@@ -9,7 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  latlong: ^0.6.1
+  latlong2: ^0.8.0
 
 dev_dependencies:
   flutter_test:
