@@ -1,3 +1,8 @@
+## 1.3.0
+
+* Null safety
+* **Breaking:** `Elevation.color` param is now required
+
 ## 1.2.0
 
 * Use `latlong2` instead of `latlong`, allowing use of `flutter_map` 0.13.1. Thanks to [https://github.com/moovida](@moovida)!

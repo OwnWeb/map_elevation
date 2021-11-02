@@ -14,14 +14,14 @@ class Elevation extends StatefulWidget {
   final List<ElevationPoint> points;
 
   /// Background color of the elevation graph
-  final Color color;
+  final Color? color;
 
   /// Elevation gradient colors
   /// See [ElevationGradientColors] for more details
-  final ElevationGradientColors elevationGradientColors;
+  final ElevationGradientColors? elevationGradientColors;
 
   /// [WidgetBuilder] like Function to add child over the graph
-  final Function(BuildContext context, Size size) child;
+  final Function(BuildContext context, Size size)? child;
 
   Elevation(this.points,
       {this.color, this.elevationGradientColors, this.child});
@@ -31,22 +31,23 @@ class Elevation extends StatefulWidget {
 }
 
 class _ElevationState extends State<Elevation> {
-  double _hoverLinePosition;
-  double _hoveredAltitude;
+  double? _hoverLinePosition;
+  double? _hoveredAltitude;
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(builder: (BuildContext context, BoxConstraints bc) {
       Offset _lbPadding = Offset(35, 6);
       _ElevationPainter elevationPainter = _ElevationPainter(widget.points,
-          paintColor: widget.color,
+          paintColor: widget.color ?? Colors.transparent,
           elevationGradientColors: widget.elevationGradientColors,
           lbPadding: _lbPadding);
       return GestureDetector(
           onHorizontalDragUpdate: (DragUpdateDetails details) {
-            ElevationPoint pointFromPosition = elevationPainter
+            final pointFromPosition = elevationPainter
                 .getPointFromPosition(details.globalPosition.dx);
-            if (pointFromPosition is ElevationPoint) {
+
+            if (pointFromPosition != null) {
               ElevationHoverNotification(pointFromPosition)..dispatch(context);
               setState(() {
                 _hoverLinePosition = details.globalPosition.dx;
@@ -65,13 +66,13 @@ class _ElevationState extends State<Elevation> {
               painter: elevationPainter,
               size: Size(bc.maxWidth, bc.maxHeight),
             ),
-            if (widget.child is Function)
+            if (widget.child != null && widget.child is Function)
               Container(
                 margin: EdgeInsets.only(left: _lbPadding.dx),
                 width: bc.maxWidth - _lbPadding.dx,
                 height: bc.maxHeight - _lbPadding.dy,
                 child: Builder(
-                    builder: (BuildContext context) => widget.child(
+                    builder: (BuildContext context) => widget.child!(
                         context,
                         Size(bc.maxWidth - _lbPadding.dx,
                             bc.maxHeight - _lbPadding.dy))),
@@ -88,11 +89,12 @@ class _ElevationState extends State<Elevation> {
                         width: 1,
                         decoration: BoxDecoration(color: Colors.black),
                       ),
-                      Text(
-                        _hoveredAltitude.round().toString(),
-                        style: TextStyle(
-                            fontSize: 10, fontWeight: FontWeight.bold),
-                      )
+                      if (_hoveredAltitude != null)
+                        Text(
+                          _hoveredAltitude!.round().toString(),
+                          style: TextStyle(
+                              fontSize: 10, fontWeight: FontWeight.bold),
+                        )
                     ]),
               )
           ]));
@@ -102,35 +104,21 @@ class _ElevationState extends State<Elevation> {
 
 class _ElevationPainter extends CustomPainter {
   List<ElevationPoint> points;
-  List<double> _relativeAltitudes;
+  late List<double> _relativeAltitudes;
   Color paintColor;
   Offset lbPadding;
-  int _min, _max;
-  double widthOffset;
-  ElevationGradientColors elevationGradientColors;
+  late int _min, _max;
+  late double widthOffset;
+  ElevationGradientColors? elevationGradientColors;
 
   _ElevationPainter(this.points,
-      {this.paintColor,
+      {required this.paintColor,
       this.lbPadding = Offset.zero,
       this.elevationGradientColors}) {
-    _min = (points
-                    .map((point) {
-                      if (point.altitude == null) return 0.0;
-                      return point.altitude;
-                    })
-                    .toList()
-                    .reduce(min) /
-                100)
+    _min = (points.map((point) => point.altitude).toList().reduce(min) / 100)
             .floor() *
         100;
-    _max = (points
-                    .map((point) {
-                      if (point.altitude == null) return 0.0;
-                      return point.altitude;
-                    })
-                    .toList()
-                    .reduce(max) /
-                100)
+    _max = (points.map((point) => point.altitude).toList().reduce(max) / 100)
             .ceil() *
         100;
 
@@ -149,7 +137,7 @@ class _ElevationPainter extends CustomPainter {
       ..strokeJoin = StrokeJoin.round
       ..blendMode = BlendMode.src
       ..style = PaintingStyle.fill
-      ..color = paintColor ?? Colors.redAccent;
+      ..color = paintColor;
     final axisPaint = Paint()
       ..strokeWidth = 2.0
       ..strokeCap = StrokeCap.round
@@ -157,7 +145,7 @@ class _ElevationPainter extends CustomPainter {
       ..blendMode = BlendMode.src
       ..style = PaintingStyle.stroke;
 
-    if (elevationGradientColors is ElevationGradientColors) {
+    if (elevationGradientColors != null) {
       List<Color> gradientColors = [paintColor];
       for (int i = 1; i < points.length; i++) {
         double dX = lg.Distance().distance(points[i], points[i - 1]);
@@ -165,11 +153,11 @@ class _ElevationPainter extends CustomPainter {
 
         double gradient = 100 * dZ / dX;
         if (gradient > 30) {
-          gradientColors.add(elevationGradientColors.gt30);
+          gradientColors.add(elevationGradientColors!.gt30);
         } else if (gradient > 20) {
-          gradientColors.add(elevationGradientColors.gt20);
+          gradientColors.add(elevationGradientColors!.gt20);
         } else if (gradient > 10) {
-          gradientColors.add(elevationGradientColors.gt10);
+          gradientColors.add(elevationGradientColors!.gt10);
         } else {
           gradientColors.add(paintColor);
         }
@@ -228,7 +216,7 @@ class _ElevationPainter extends CustomPainter {
   double _getYForAltitude(double altitude, Size size) =>
       size.height - altitude * size.height - lbPadding.dy;
 
-  ElevationPoint getPointFromPosition(double position) {
+  ElevationPoint? getPointFromPosition(double position) {
     int index = ((position - lbPadding.dx) / widthOffset).round();
 
     if (index >= points.length || index < 0) return null;
@@ -246,7 +234,7 @@ class _ElevationPainter extends CustomPainter {
 /// [Notification] emitted when graph is hovered
 class ElevationHoverNotification extends Notification {
   /// Hovered point coordinates
-  final ElevationPoint position;
+  final ElevationPoint? position;
 
   ElevationHoverNotification(this.position);
 }
@@ -263,7 +251,8 @@ class ElevationGradientColors {
   /// Used when elevation gradient is > 30%
   final Color gt30;
 
-  ElevationGradientColors({this.gt10, this.gt20, this.gt30});
+  ElevationGradientColors(
+      {required this.gt10, required this.gt20, required this.gt30});
 }
 
 /// Geographic point with elevation
