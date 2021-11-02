@@ -14,7 +14,7 @@ class Elevation extends StatefulWidget {
   final List<ElevationPoint> points;
 
   /// Background color of the elevation graph
-  final Color color;
+  final Color? color;
 
   /// Elevation gradient colors
   /// See [ElevationGradientColors] for more details
@@ -24,7 +24,7 @@ class Elevation extends StatefulWidget {
   final Function(BuildContext context, Size size)? child;
 
   Elevation(this.points,
-      {required this.color, this.elevationGradientColors, this.child});
+      {this.color, this.elevationGradientColors, this.child});
 
   @override
   State<StatefulWidget> createState() => _ElevationState();
@@ -39,12 +39,8 @@ class _ElevationState extends State<Elevation> {
     return LayoutBuilder(builder: (BuildContext context, BoxConstraints bc) {
       Offset _lbPadding = Offset(35, 6);
       _ElevationPainter elevationPainter = _ElevationPainter(widget.points,
-          paintColor: widget.color,
-          elevationGradientColors: widget.elevationGradientColors ??
-              ElevationGradientColors(
-                  gt10: Colors.green,
-                  gt20: Colors.orangeAccent,
-                  gt30: Colors.redAccent),
+          paintColor: widget.color ?? Colors.transparent,
+          elevationGradientColors: widget.elevationGradientColors,
           lbPadding: _lbPadding);
       return GestureDetector(
           onHorizontalDragUpdate: (DragUpdateDetails details) {
@@ -113,12 +109,12 @@ class _ElevationPainter extends CustomPainter {
   Offset lbPadding;
   late int _min, _max;
   late double widthOffset;
-  ElevationGradientColors elevationGradientColors;
+  ElevationGradientColors? elevationGradientColors;
 
   _ElevationPainter(this.points,
       {required this.paintColor,
       this.lbPadding = Offset.zero,
-      required this.elevationGradientColors}) {
+      this.elevationGradientColors}) {
     _min = (points.map((point) => point.altitude).toList().reduce(min) / 100)
             .floor() *
         100;
@@ -149,7 +145,7 @@ class _ElevationPainter extends CustomPainter {
       ..blendMode = BlendMode.src
       ..style = PaintingStyle.stroke;
 
-    if (elevationGradientColors is ElevationGradientColors) {
+    if (elevationGradientColors != null) {
       List<Color> gradientColors = [paintColor];
       for (int i = 1; i < points.length; i++) {
         double dX = lg.Distance().distance(points[i], points[i - 1]);
@@ -157,11 +153,11 @@ class _ElevationPainter extends CustomPainter {
 
         double gradient = 100 * dZ / dX;
         if (gradient > 30) {
-          gradientColors.add(elevationGradientColors.gt30);
+          gradientColors.add(elevationGradientColors!.gt30);
         } else if (gradient > 20) {
-          gradientColors.add(elevationGradientColors.gt20);
+          gradientColors.add(elevationGradientColors!.gt20);
         } else if (gradient > 10) {
-          gradientColors.add(elevationGradientColors.gt10);
+          gradientColors.add(elevationGradientColors!.gt10);
         } else {
           gradientColors.add(paintColor);
         }
