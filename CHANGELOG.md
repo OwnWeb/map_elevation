@@ -1,4 +1,4 @@
-## 1.3.0
+## 2.0.0
 
 * Null safety
 * **Breaking:** `Elevation.color` param is now required
