@@ -94,9 +94,9 @@ class _MyHomePageState extends State<MyHomePage> {
               ],
             ),
             MarkerLayerOptions(markers: [
-              if (hoverPoint is LatLng)
+              if (hoverPoint != null)
                 Marker(
-                    point: hoverPoint,
+                    point: hoverPoint.latLng,
                     width: 8,
                     height: 8,
                     builder: (BuildContext context) => Container(
