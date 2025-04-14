@@ -1,9 +1,5 @@
 library map_elevation;
 
-export 'elevation_legend.dart';
-export 'elevation_point.dart';
-export 'elevation_functions.dart';
-
 import 'dart:math';
 import 'dart:ui' as ui;
 
@@ -13,6 +9,10 @@ import 'package:units_converter/models/extension_converter.dart';
 import 'package:units_converter/properties/length.dart';
 
 import 'elevation_point.dart';
+
+export 'elevation_functions.dart';
+export 'elevation_legend.dart';
+export 'elevation_point.dart';
 
 /// Elevation statefull widget
 class Elevation extends StatefulWidget {
@@ -156,25 +156,56 @@ class _ElevationState extends State<Elevation> {
                 ),
               ),
             if (_hoverLinePosition != null)
-              Positioned(
-                left: _hoverLinePosition,
-                top: 0,
-                child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Container(
-                        height: bc.maxHeight,
-                        width: 1,
-                        decoration: BoxDecoration(color: Colors.black),
+              Builder(
+                builder: (context) {
+                  // Estimate tooltip width based on text length
+                  final String altitudeText = _hoveredAltitude != null
+                      ? _hoveredAltitude!.round().toString()
+                      : "0";
+                  final double estimatedWidth =
+                      altitudeText.length * 8.0 + 10.0;
+
+                  // Check if tooltip would go beyond the right edge
+                  final bool isNearRightEdge =
+                      _hoverLinePosition! + estimatedWidth > bc.maxWidth;
+
+                  // Position the vertical line
+                  return Stack(
+                    children: [
+                      // Vertical line
+                      Positioned(
+                        left: _hoverLinePosition,
+                        top: 0,
+                        child: Container(
+                          height: bc.maxHeight,
+                          width: 1,
+                          decoration: BoxDecoration(color: Colors.black),
+                        ),
                       ),
+                      // Tooltip
                       if (_hoveredAltitude != null)
-                        Text(
-                          _hoveredAltitude!.round().toString(),
-                          style: TextStyle(
-                              fontSize: 10, fontWeight: FontWeight.bold),
-                        )
-                    ]),
-              )
+                        Positioned(
+                          // If near right edge, position tooltip to the left of the line
+                          left: isNearRightEdge
+                              ? _hoverLinePosition! - estimatedWidth
+                              : _hoverLinePosition,
+                          top: 0,
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 4, vertical: 2),
+                            child: Text(
+                              altitudeText,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
+                },
+              ),
           ]));
     });
   }
@@ -256,58 +287,55 @@ class _ElevationPainter extends CustomPainter {
     _drawAltitudeMarks(canvas, size);
     canvas.saveLayer(rect, Paint());
 
-    widthOffset = (size.width - lbPadding.dx) / _relativeAltitudes.length;
+    widthOffset = (size.width - lbPadding.dx) / (_relativeAltitudes.length - 1);
 
-    // If we have grouped points, draw each group separately
+    // Create a list of segments to draw, whether from grouped points or a single list
+    List<List<ElevationPoint>> segments = [];
     if (groupedElevationPoints != null) {
-      int currentIndex = 0;
-      for (final group in groupedElevationPoints!) {
-        final path = Path();
-
-        // Get relative altitudes for this group
-        final groupRelativeAltitudes = group
-            .map((point) =>
-                (point.altitude.convertFromTo(LENGTH.meters, unit)! - _min) /
-                (_max - _min))
-            .toList();
-
-        // Start the path
-        path.moveTo(currentIndex * widthOffset + lbPadding.dx,
-            _getYForAltitude(groupRelativeAltitudes[0], size));
-
-        // Draw lines for this group
-        for (var i = 0; i < group.length; i++) {
-          path.lineTo((currentIndex + i) * widthOffset + lbPadding.dx,
-              _getYForAltitude(groupRelativeAltitudes[i], size));
-        }
-
-        // Complete the path to the bottom
-        path.lineTo(
-            (currentIndex + group.length - 1) * widthOffset + lbPadding.dx,
-            size.height - lbPadding.dy);
-        path.lineTo(currentIndex * widthOffset + lbPadding.dx,
-            size.height - lbPadding.dy);
-        path.close();
-
-        paint.shader = _createGradientShader(size, group);
-
-        canvas.drawPath(path, paint);
-        currentIndex += group.length;
-      }
+      segments = groupedElevationPoints!;
     } else {
-      // Single path drawing logic
-      final path = Path()
-        ..moveTo(lbPadding.dx, _getYForAltitude(_relativeAltitudes[0], size));
-      _relativeAltitudes.asMap().forEach((int index, double altitude) {
-        path.lineTo(index * widthOffset + lbPadding.dx,
-            _getYForAltitude(altitude, size));
-      });
-      path.lineTo(size.width, size.height - lbPadding.dy);
-      path.lineTo(lbPadding.dx, size.height - lbPadding.dy);
+      segments = [points];
+    }
 
-      paint.shader = _createGradientShader(size, points);
+    int currentIndex = 0;
+    for (final segment in segments) {
+      if (segment.isEmpty) continue;
 
+      // Get relative altitudes for this segment
+      final segmentRelativeAltitudes = segment
+          .map((point) =>
+              (point.altitude.convertFromTo(LENGTH.meters, unit)! - _min) /
+              (_max - _min))
+          .toList();
+
+      final path = Path();
+
+      // Start the path
+      path.moveTo(currentIndex * widthOffset + lbPadding.dx,
+          _getYForAltitude(segmentRelativeAltitudes[0], size));
+
+      // Draw lines for this segment
+      for (var i = 0; i < segment.length; i++) {
+        path.lineTo((currentIndex + i) * widthOffset + lbPadding.dx,
+            _getYForAltitude(segmentRelativeAltitudes[i], size));
+      }
+
+      // Complete the path to the bottom
+      final lastPointX =
+          (currentIndex + segment.length - 1) * widthOffset + lbPadding.dx;
+
+      path.lineTo(lastPointX, size.height - lbPadding.dy);
+      path.lineTo(currentIndex * widthOffset + lbPadding.dx,
+          size.height - lbPadding.dy);
+      path.close();
+
+      paint.shader = _createGradientShader(size, segment);
       canvas.drawPath(path, paint);
+
+      // Only increment index if we're processing grouped points
+      if (groupedElevationPoints != null) {
+        currentIndex += segment.length;
+      }
     }
 
     final scaleTextStyleOrDefault =
@@ -442,12 +470,6 @@ class _ElevationPainter extends CustomPainter {
     return points[index];
   }
 
-  List<double> _calculateColorsStop(List gradientColors) {
-    final colorsStopInterval = 1.0 / gradientColors.length;
-    return List.generate(
-        gradientColors.length, (index) => index * colorsStopInterval);
-  }
-
   ui.Gradient? _createGradientShader(
       Size size, List<ElevationPoint> groupPoints) {
     List<Color> gradientColors = [];
@@ -481,68 +503,92 @@ class _ElevationPainter extends CustomPainter {
 
   List<Color> _calculateGradientColorsForElevation(
       List<ElevationPoint> groupPoints) {
-    List<Color> gradientColors = [paintColor];
-    for (int i = 1; i < groupPoints.length; i++) {
-      double dX =
-          (const lg.Distance().distance(groupPoints[i], groupPoints[i - 1]))
-                  .convertFromTo(LENGTH.meters, unit) ??
-              0;
-      double dZ =
-          ((groupPoints[i].altitude.convertFromTo(LENGTH.meters, unit) ?? 0) -
-              (groupPoints[i - 1].altitude.convertFromTo(LENGTH.meters, unit) ??
-                  0));
-
-      double gradient = 100 * dZ / dX;
-
-      //Handle "greater than" values first
-      if (gradient > 30 && parametersColors!.containsKey(30)) {
-        gradientColors.add(parametersColors![30]!);
-      } else if (gradient > 20 && parametersColors!.containsKey(20)) {
-        gradientColors.add(parametersColors![20]!);
-      } else if (gradient > 15 && parametersColors!.containsKey(15)) {
-        gradientColors.add(parametersColors![15]!);
-      } else if (gradient > 10 && parametersColors!.containsKey(10)) {
-        gradientColors.add(parametersColors![10]!);
-        //handle lower than values (they will override "greater than" values)
-      } else if (gradient < 5 && parametersColors!.containsKey(-5)) {
-        gradientColors.add(parametersColors![-5]!);
-      } else if (gradient < 7 && parametersColors!.containsKey(-7)) {
-        gradientColors.add(parametersColors![-7]!);
-      } else if (gradient < 10 && parametersColors!.containsKey(-10)) {
-        gradientColors.add(parametersColors![-10]!);
-      } else if (gradient < 15 && parametersColors!.containsKey(-15)) {
-        gradientColors.add(parametersColors![-15]!);
+    // Helper function to determine color based on gradient
+    Color _getColorForGradient(double gradient) {
+      if (gradient >= 30 && parametersColors!.containsKey(30)) {
+        return parametersColors![30]!;
+      } else if (gradient >= 20 && parametersColors!.containsKey(20)) {
+        return parametersColors![20]!;
+      } else if (gradient >= 15 && parametersColors!.containsKey(15)) {
+        return parametersColors![15]!;
+      } else if (gradient >= 10 && parametersColors!.containsKey(10)) {
+        return parametersColors![10]!;
+      } else if (gradient <= 5 && parametersColors!.containsKey(-5)) {
+        return parametersColors![-5]!;
+      } else if (gradient <= 7 && parametersColors!.containsKey(-7)) {
+        return parametersColors![-7]!;
+      } else if (gradient <= 10 && parametersColors!.containsKey(-10)) {
+        return parametersColors![-10]!;
+      } else if (gradient <= 15 && parametersColors!.containsKey(-15)) {
+        return parametersColors![-15]!;
       } else {
-        gradientColors.add(paintColor);
+        return paintColor;
       }
     }
+
+    List<Color> gradientColors = [];
+
+    // Handle empty list or single point
+    if (groupPoints.isEmpty) {
+      return [];
+    } else if (groupPoints.length == 1) {
+      return [paintColor];
+    }
+
+    // Handle the case differently - one color per segment, not per point
+    for (int i = 0; i < groupPoints.length - 1; i++) {
+      // Calculate gradient between this point and the next
+      double dX =
+          (const lg.Distance().distance(groupPoints[i + 1], groupPoints[i]))
+                  .convertFromTo(LENGTH.meters, unit) ??
+              0;
+      double dZ = ((groupPoints[i + 1]
+                  .altitude
+                  .convertFromTo(LENGTH.meters, unit) ??
+              0) -
+          (groupPoints[i].altitude.convertFromTo(LENGTH.meters, unit) ?? 0));
+
+      double gradient = dX > 0 ? 100 * dZ / dX : 0;
+      gradientColors.add(_getColorForGradient(gradient));
+    }
+
+    // For the last point, use the same color as the last segment
+    gradientColors.add(gradientColors.last);
+
     return gradientColors;
   }
 
-  _calculateGradientColorsForParameter(List<ElevationPoint> groupPoints) {
-    List<Color> gradientColors = [paintColor];
+  List<Color> _calculateGradientColorsForParameter(
+      List<ElevationPoint> groupPoints) {
+    List<Color> gradientColors = [];
     Color? colorTypeSet;
-    for (int i = 1; i < groupPoints.length; i++) {
+
+    // Process each point
+    for (int i = 0; i < groupPoints.length; i++) {
+      bool parameterFound = false;
+
       // Check if the point has the wanted parameter type
       if (groupPoints[i].parameters.isNotEmpty) {
         for (int j = 0; j < groupPoints[i].parameters.length; j++) {
           if (groupPoints[i].parameters[j]["type"] == parameter) {
-            //we get the correct color according to the subtype
-            gradientColors.add(
-                parametersColors![groupPoints[i].parameters[j]["sub_type"]]!);
-            //save color for the next points
-            colorTypeSet =
-                parametersColors![groupPoints[i].parameters[j]["sub_type"]];
-          } else {
-            //If the type don't match the wanted parameter, we use the last color set
-            gradientColors.add(colorTypeSet ?? paintColor);
+            // Get the correct color according to the subtype
+            Color pointColor =
+                parametersColors![groupPoints[i].parameters[j]["sub_type"]]!;
+            gradientColors.add(pointColor);
+            // Save color for the next points
+            colorTypeSet = pointColor;
+            parameterFound = true;
+            break;
           }
         }
-      } else {
-        //If the point has no type, we use the last color set (if it has been set
+      }
+
+      // If no matching parameter found, use the last color set or default
+      if (!parameterFound) {
         gradientColors.add(colorTypeSet ?? paintColor);
       }
     }
+
     return gradientColors;
   }
 }

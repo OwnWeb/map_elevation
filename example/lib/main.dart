@@ -1,4 +1,5 @@
 import 'dart:collection';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -161,16 +162,18 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final points = getPoints(raw);
+
     //get legend second  text
     List<String> secondLegendList = [];
     if (colorParameter != ParameterItems.elevation) {
       secondLegendList = getParameterDistributionPercentageString(
-          points: getPoints(),
+          points: points,
           parameter: colorParameter.value!,
           parameterValues: colorParameter.subTypes);
     } else {
       secondLegendList = getElevationDistributionPercentageString(
-          points: getPoints(), subtypes: [-5, -7, -10, -15, 15]);
+          points: points, subtypes: [-5, -7, -10, -15, 15]);
     }
 
     return Scaffold(
@@ -195,7 +198,7 @@ class _MyHomePageState extends State<MyHomePage> {
               polylines: [
                 Polyline(
                   // An optional tag to distinguish polylines in callback
-                  points: getPoints(),
+                  points: points,
                   color: Colors.red,
                   strokeWidth: 3.0,
                 ),
@@ -247,7 +250,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       onNotification:
                           (ElevationHoverNotification notification) {
                         setState(() {
-                          hoverPoint = notification.position!;
+                          hoverPoint = notification.position;
                         });
 
                         return true;
@@ -255,7 +258,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       child: Elevation(
                           totalDistance: 51000,
                           parameterUsedToColor: colorParameter.value,
-                          getPoints(),
+                          points,
                           color: Color(0xFF172033),
                           parameterValuesAndColorsMap:
                               colorParameter.colorValueMap)),
