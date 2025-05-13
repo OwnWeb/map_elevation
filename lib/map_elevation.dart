@@ -457,7 +457,13 @@ class _ElevationPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _ElevationPainter oldDelegate) {
+    return points != oldDelegate.points ||
+        paintColor != oldDelegate.paintColor ||
+        parameter != oldDelegate.parameter ||
+        parametersColors != oldDelegate.parametersColors ||
+        unit != oldDelegate.unit;
+  }
 
   double _getYForAltitude(double altitude, Size size) =>
       size.height - altitude * size.height - lbPadding.dy;
