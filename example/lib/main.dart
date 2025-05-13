@@ -104,6 +104,36 @@ enum ParameterItems {
         };
     }
   }
+
+  List<LegendItem> toLegendItems(List<ElevationPoint> points) {
+    final items = <LegendItem>[];
+    final colorMap = colorLabelMap;
+
+    // Get percentage values based on type
+    List<String> percentages = [];
+    if (this != ParameterItems.elevation) {
+      percentages = getParameterDistributionPercentageString(
+          points: points, parameter: value!, parameterValues: subTypes);
+    } else {
+      percentages = getElevationDistributionPercentageString(
+          points: points, subtypes: [-5, -7, -10, -15, 15]);
+    }
+
+    // Create legend items
+    int index = 0;
+    for (final entry in colorMap.entries) {
+      items.add(
+        LegendItem(
+          label: entry.key,
+          color: entry.value,
+          value: index < percentages.length ? percentages[index] : null,
+        ),
+      );
+      index++;
+    }
+
+    return items;
+  }
 }
 
 typedef ParameterEntry = DropdownMenuEntry<ParameterItems>;
@@ -163,18 +193,6 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     final points = getPoints(raw);
-
-    //get legend second  text
-    List<String> secondLegendList = [];
-    if (colorParameter != ParameterItems.elevation) {
-      secondLegendList = getParameterDistributionPercentageString(
-          points: points,
-          parameter: colorParameter.value!,
-          parameterValues: colorParameter.subTypes);
-    } else {
-      secondLegendList = getElevationDistributionPercentageString(
-          points: points, subtypes: [-5, -7, -10, -15, 15]);
-    }
 
     return Scaffold(
       appBar: AppBar(
@@ -247,26 +265,25 @@ class _MyHomePageState extends State<MyHomePage> {
                   height: 120,
                   width: MediaQuery.of(context).size.width,
                   child: NotificationListener<ElevationHoverNotification>(
-                      onNotification:
-                          (ElevationHoverNotification notification) {
-                        setState(() {
-                          hoverPoint = notification.position;
-                        });
-
-                        return true;
-                      },
-                      child: Elevation(
-                          totalDistance: 51000,
-                          parameterUsedToColor: colorParameter.value,
-                          points,
-                          color: Color(0xFF172033),
-                          parameterValuesAndColorsMap:
-                              colorParameter.colorValueMap)),
+                    onNotification: (ElevationHoverNotification notification) {
+                      setState(() {
+                        hoverPoint = notification.position;
+                      });
+                      return true;
+                    },
+                    child: Elevation(
+                        totalDistance: 51000,
+                        parameterUsedToColor: colorParameter.value,
+                        points,
+                        color: Color(0xFF172033),
+                        parameterValuesAndColorsMap:
+                            colorParameter.colorValueMap),
+                  ),
                 ),
                 ElevationLegend(
                   columns: 2,
-                  parameterLabelAndColorsMap: colorParameter.colorLabelMap,
-                  secondLegendTextList: [], //secondLegendList,
+                  distribution: LegendDistribution.byRow,
+                  legendItems: colorParameter.toLegendItems(points),
                 )
               ],
             ),
