@@ -3,6 +3,7 @@ library map_elevation;
 import 'dart:math';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart' as lg;
 import 'package:units_converter/models/extension_converter.dart';
@@ -13,6 +14,27 @@ import 'elevation_point.dart';
 export 'elevation_functions.dart';
 export 'elevation_legend.dart';
 export 'elevation_point.dart';
+
+/// Room kept on the left for the altitude labels.
+const double _kAltitudeScaleWidth = 35;
+
+/// The altitude scale labels every hundred, and aims for that many marks.
+const int _kAltitudeScaleStep = 100;
+const int _kAltitudeScaleMarkCount = 5;
+const double _kAltitudeMarkLength = 10;
+const double _kDashWidth = 4;
+const double _kDashSpace = 5;
+
+/// The distance labels sit in the bottom band, and need their own leading in it.
+const double _kDistanceLabelLeading = 1.4;
+
+/// Defaults for the ridge line and the markers pinned on it.
+const double _kDefaultStrokeWidth = 1.4;
+const double _kDefaultMarkerRadius = 2.4;
+const double _kDefaultMarkerStrokeWidth = 1.3;
+
+const TextStyle _kDefaultScaleTextStyle =
+    TextStyle(color: Colors.black, fontSize: 10);
 
 /// Elevation statefull widget
 class Elevation extends StatefulWidget {
@@ -54,6 +76,25 @@ class Elevation extends StatefulWidget {
 
   final List<List<ElevationPoint>>? groupedElevationPoints;
 
+  /// Whether the altitude scale is drawn: the labels on the left and the dashed
+  /// lines across. Hidden, the track uses the full height instead of a range
+  /// rounded to hundreds, and the room kept on the left goes back to the graph.
+  final bool showAltitudeScale;
+
+  /// The line drawn on the ridge, over the filled area. None when null.
+  final ElevationStroke? stroke;
+
+  /// Round dots pinned on the ridge, at chosen points. None when null.
+  final ElevationMarkers? markers;
+
+  /// The drag line and its altitude label. Black, as before, when null.
+  final Color? hoverColor;
+
+  /// Text of the last mark of the distance scale, which carries the whole
+  /// length of the track. The plugin cannot localise a decimal separator, so a
+  /// caller that cares passes its own. Trimmed to one decimal when null.
+  final String? totalDistanceLabel;
+
   Elevation(this.points,
       {this.color,
       this.parameterValuesAndColorsMap,
@@ -65,7 +106,12 @@ class Elevation extends StatefulWidget {
       this.totalDistance,
       this.progression,
       this.unit = LENGTH.meters,
-      this.groupedElevationPoints});
+      this.groupedElevationPoints,
+      this.showAltitudeScale = true,
+      this.stroke,
+      this.markers,
+      this.hoverColor,
+      this.totalDistanceLabel});
 
   @override
   State<StatefulWidget> createState() => _ElevationState();
@@ -80,7 +126,11 @@ class _ElevationState extends State<Elevation> {
     const progressionWidth = 20.0;
 
     return LayoutBuilder(builder: (BuildContext context, BoxConstraints bc) {
-      Offset _lbPadding = Offset(35, 10);
+      final double scaleFontSize = widget.scaleTextStyle?.fontSize ??
+          _kDefaultScaleTextStyle.fontSize!;
+      Offset _lbPadding = Offset(
+          widget.showAltitudeScale ? _kAltitudeScaleWidth : 0,
+          scaleFontSize * _kDistanceLabelLeading);
       _ElevationPainter elevationPainter = _ElevationPainter(widget.points,
           unit: widget.unit,
           paintColor: widget.color ?? Colors.transparent,
@@ -91,17 +141,21 @@ class _ElevationState extends State<Elevation> {
           dashedAltitudesColor: widget.dashedAltitudesColor,
           totalDistance: widget.totalDistance,
           lbPadding: _lbPadding,
+          showAltitudeScale: widget.showAltitudeScale,
+          stroke: widget.stroke,
+          markers: widget.markers,
+          totalDistanceLabel: widget.totalDistanceLabel,
           groupedElevationPoints: widget.groupedElevationPoints);
 
       return GestureDetector(
           onHorizontalDragUpdate: (DragUpdateDetails details) {
             final pointFromPosition = elevationPainter
-                .getPointFromPosition(details.globalPosition.dx);
+                .getPointFromPosition(details.localPosition.dx);
 
             if (pointFromPosition != null) {
               ElevationHoverNotification(pointFromPosition)..dispatch(context);
               setState(() {
-                _hoverLinePosition = details.globalPosition.dx;
+                _hoverLinePosition = details.localPosition.dx;
                 _hoveredAltitude = pointFromPosition.altitude
                     .convertFromTo(LENGTH.meters, widget.unit);
               });
@@ -179,7 +233,8 @@ class _ElevationState extends State<Elevation> {
                         child: Container(
                           height: bc.maxHeight,
                           width: 1,
-                          decoration: BoxDecoration(color: Colors.black),
+                          decoration: BoxDecoration(
+                              color: widget.hoverColor ?? Colors.black),
                         ),
                       ),
                       // Tooltip
@@ -196,6 +251,7 @@ class _ElevationState extends State<Elevation> {
                             child: Text(
                               altitudeText,
                               style: TextStyle(
+                                color: widget.hoverColor,
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -222,7 +278,7 @@ class _ElevationPainter extends CustomPainter {
   Color? scaleColor;
   Color? dashedAltitudesColor;
   Offset lbPadding;
-  late int _min, _max;
+  late double _min, _max;
   late double widthOffset;
   num? totalDistance;
   List<List<ElevationPoint>>? groupedElevationPoints;
@@ -234,10 +290,14 @@ class _ElevationPainter extends CustomPainter {
   /// The parameter chosen to color the graph, if null, it means the elevation is used to color the graph
   int? parameter;
 
+  final bool showAltitudeScale;
+  final ElevationStroke? stroke;
+  final ElevationMarkers? markers;
+  final String? totalDistanceLabel;
+
   // TODO Pass this as parameters !
   bool dashedAltitudes = true;
   bool scaleAltitudesMarks = false;
-
   bool altitudeScaleLineVisible = false;
   bool withDistanceScale = true;
 
@@ -251,7 +311,11 @@ class _ElevationPainter extends CustomPainter {
       this.dashedAltitudesColor,
       this.totalDistance,
       this.scaleColor,
-      this.groupedElevationPoints}) {
+      this.groupedElevationPoints,
+      this.showAltitudeScale = true,
+      this.stroke,
+      this.markers,
+      this.totalDistanceLabel}) {
     final allPoints =
         groupedElevationPoints?.expand((e) => e).toList() ?? points;
     final mapPointsAltitudesWithCurrentUnit = allPoints
@@ -263,8 +327,21 @@ class _ElevationPainter extends CustomPainter {
       _relativeAltitudes = [];
       return;
     }
-    _min = (mapPointsAltitudesWithCurrentUnit.reduce(min) / 100).floor() * 100;
-    _max = (mapPointsAltitudesWithCurrentUnit.reduce(max) / 100).ceil() * 100;
+    final double lowest = mapPointsAltitudesWithCurrentUnit.reduce(min);
+    final double highest = mapPointsAltitudesWithCurrentUnit.reduce(max);
+
+    // The scale labels whole steps, so its range has to land on them. Without
+    // it, rounding only costs the track the height it could have used.
+    _min = showAltitudeScale
+        ? (lowest / _kAltitudeScaleStep).floor() *
+            _kAltitudeScaleStep.toDouble()
+        : lowest;
+    _max = showAltitudeScale
+        ? (highest / _kAltitudeScaleStep).ceil() * _kAltitudeScaleStep.toDouble()
+        : highest;
+
+    // A flat track would divide by zero and paint nothing but NaN.
+    if (_max == _min) _max = _min + _kAltitudeScaleStep;
 
     _relativeAltitudes = mapPointsAltitudesWithCurrentUnit
         .map((altitude) => (altitude - _min) / (_max - _min))
@@ -284,7 +361,7 @@ class _ElevationPainter extends CustomPainter {
       ..style = PaintingStyle.fill
       ..color = paintColor;
 
-    _drawAltitudeMarks(canvas, size);
+    if (showAltitudeScale) _drawAltitudeMarks(canvas, size);
     canvas.saveLayer(rect, Paint());
 
     widthOffset = (size.width - lbPadding.dx) / (_relativeAltitudes.length - 1);
@@ -297,6 +374,8 @@ class _ElevationPainter extends CustomPainter {
       segments = [points];
     }
 
+    final List<Path> ridgePaths = [];
+
     int currentIndex = 0;
     for (final segment in segments) {
       if (segment.isEmpty) continue;
@@ -308,15 +387,15 @@ class _ElevationPainter extends CustomPainter {
               (_max - _min))
           .toList();
 
-      final path = Path();
+      final ridge = Path();
 
       // Start the path
-      path.moveTo(currentIndex * widthOffset + lbPadding.dx,
+      ridge.moveTo(currentIndex * widthOffset + lbPadding.dx,
           _getYForAltitude(segmentRelativeAltitudes[0], size));
 
       // Draw lines for this segment
       for (var i = 0; i < segment.length; i++) {
-        path.lineTo((currentIndex + i) * widthOffset + lbPadding.dx,
+        ridge.lineTo((currentIndex + i) * widthOffset + lbPadding.dx,
             _getYForAltitude(segmentRelativeAltitudes[i], size));
       }
 
@@ -324,13 +403,15 @@ class _ElevationPainter extends CustomPainter {
       final lastPointX =
           (currentIndex + segment.length - 1) * widthOffset + lbPadding.dx;
 
-      path.lineTo(lastPointX, size.height - lbPadding.dy);
-      path.lineTo(currentIndex * widthOffset + lbPadding.dx,
-          size.height - lbPadding.dy);
-      path.close();
+      final area = Path.from(ridge)
+        ..lineTo(lastPointX, size.height - lbPadding.dy)
+        ..lineTo(currentIndex * widthOffset + lbPadding.dx,
+            size.height - lbPadding.dy)
+        ..close();
 
       paint.shader = _createGradientShader(size, segment);
-      canvas.drawPath(path, paint);
+      canvas.drawPath(area, paint);
+      ridgePaths.add(ridge);
 
       // Only increment index if we're processing grouped points
       if (groupedElevationPoints != null) {
@@ -338,66 +419,88 @@ class _ElevationPainter extends CustomPainter {
       }
     }
 
-    final scaleTextStyleOrDefault =
-        scaleTextStyle ?? const TextStyle(color: Colors.black, fontSize: 10);
+    _drawRidgeStroke(canvas, ridgePaths);
+    _drawMarkers(canvas, size);
+
+    final scaleTextStyleOrDefault = scaleTextStyle ?? _kDefaultScaleTextStyle;
 
     if (withDistanceScale && totalDistance != null) {
-      const minimumSpaceBetweenDistanceScaleSegmentKilometersMarks = 30;
-      final totalDistanceInCurrentLargestUnit = (totalDistance!.convertFromTo(
-              LENGTH.meters,
-              unit == LENGTH.meters ? LENGTH.kilometers : LENGTH.miles) ??
-          0);
-      // We display the 0 so we add one segment
-      final numberOfScaleSegments =
-          totalDistanceInCurrentLargestUnit.floor() + 1;
-      var distanceBetweenScaleSegments = size.width ~/ numberOfScaleSegments;
-      var displayEveryNSegments = 1;
-
-      while ((displayEveryNSegments * distanceBetweenScaleSegments) <=
-          minimumSpaceBetweenDistanceScaleSegmentKilometersMarks) {
-        displayEveryNSegments = displayEveryNSegments + 1;
-      }
-
-      // If number is round, we keep it short form, otherwise, we keep it with 1 single digit after the ,
-      var largestScaleLabel =
-          totalDistanceInCurrentLargestUnit.roundToDouble() ==
-                  totalDistanceInCurrentLargestUnit
-              ? totalDistanceInCurrentLargestUnit
-              : num.parse(totalDistanceInCurrentLargestUnit.toStringAsFixed(1));
-
-      if (numberOfScaleSegments >= 1) {
-        // Should be between 0 and 1 km
-        for (var i = 0;
-            i <= numberOfScaleSegments;
-            i += displayEveryNSegments) {
-          final relativeHorizontalPosition = (i / largestScaleLabel);
-          final xPosition = lbPadding.dx +
-              (size.width - lbPadding.dx) * relativeHorizontalPosition;
-          TextPainter(
-              text:
-                  TextSpan(style: scaleTextStyleOrDefault, text: i.toString()),
-              textDirection: TextDirection.ltr)
-            ..layout()
-            ..paint(
-                canvas,
-                Offset(
-                    // 2.5 is arbitrary here, as a 80/20 to consider "text width" and center text
-                    xPosition - 2.5,
-                    size.height -
-                        (scaleTextStyleOrDefault.fontSize!.toDouble() * 1.2)));
-        }
-      }
+      _drawDistanceScale(canvas, size, scaleTextStyleOrDefault);
     }
 
     canvas.restore();
   }
 
-  void _drawAltitudeMarks(Canvas canvas, Size size) {
-    int roundedAltitudeDiff = _max.ceil() - _min.floor();
-    int axisStep = max(100, (roundedAltitudeDiff / 5).round());
+  void _drawDistanceScale(Canvas canvas, Size size, TextStyle scaleTextStyle) {
+    const double minimumSpaceBetweenMarks = 30;
 
-    final scaleTextStyleOrDefault =
-        scaleTextStyle ?? const TextStyle(color: Colors.black, fontSize: 10);
+    final double total = (totalDistance!.convertFromTo(LENGTH.meters,
+                unit == LENGTH.meters ? LENGTH.kilometers : LENGTH.miles) ??
+            0)
+        .toDouble();
+    if (total <= 0) return;
+
+    final int lastWholeMark = total.floor();
+
+    // The zero counts as a mark when spacing them out.
+    final int spaceBetweenMarks = size.width ~/ (lastWholeMark + 1);
+    if (spaceBetweenMarks == 0) return;
+
+    var displayEveryNMarks = 1;
+    while (displayEveryNMarks * spaceBetweenMarks <= minimumSpaceBetweenMarks) {
+      displayEveryNMarks++;
+    }
+
+    final double plotWidth = size.width - lbPadding.dx;
+    final double y =
+        size.height - scaleTextStyle.fontSize! * _kDistanceLabelLeading;
+    double xOf(num value) => lbPadding.dx + plotWidth * (value / total);
+
+    final double totalX = xOf(total);
+
+    for (var mark = 0; mark <= lastWholeMark; mark += displayEveryNMarks) {
+      final double x = xOf(mark);
+
+      // The total always keeps its mark; a whole one crowding it is dropped.
+      if (mark > 0 && totalX - x < minimumSpaceBetweenMarks) continue;
+
+      _paintScaleLabel(canvas, size, '$mark', x, y, scaleTextStyle);
+    }
+
+    _paintScaleLabel(canvas, size, totalDistanceLabel ?? _trimmedTotal(total),
+        totalX, y, scaleTextStyle);
+  }
+
+  /// One decimal, and no trailing zero on a round distance.
+  String _trimmedTotal(double total) {
+    final String fixed = total.toStringAsFixed(1);
+
+    return fixed.endsWith('.0')
+        ? fixed.substring(0, fixed.length - 2)
+        : fixed;
+  }
+
+  void _paintScaleLabel(Canvas canvas, Size size, String label, double x,
+      double y, TextStyle style) {
+    final painter = TextPainter(
+        text: TextSpan(style: style, text: label),
+        textDirection: TextDirection.ltr)
+      ..layout();
+
+    // Centred on its own mark, but never off the canvas: with no altitude
+    // scale keeping room on the left, the first mark sits on x = 0.
+    final double left = (x - painter.width / 2)
+        .clamp(0.0, max(0.0, size.width - painter.width));
+
+    painter.paint(canvas, Offset(left, y));
+  }
+
+  void _drawAltitudeMarks(Canvas canvas, Size size) {
+    final int roundedAltitudeDiff = _max.ceil() - _min.floor();
+    final int axisStep = max(_kAltitudeScaleStep,
+        (roundedAltitudeDiff / _kAltitudeScaleMarkCount).round());
+
+    final scaleTextStyleOrDefault = scaleTextStyle ?? _kDefaultScaleTextStyle;
 
     final axisPaint = Paint()
       ..strokeWidth = 2.0
@@ -406,32 +509,17 @@ class _ElevationPainter extends CustomPainter {
       ..blendMode = BlendMode.src
       ..style = PaintingStyle.stroke;
 
-    for (var altitude in List<double>.generate(
+    for (final altitude in List<double>.generate(
         (roundedAltitudeDiff / axisStep).round(),
-        (i) => (axisStep * i + _min).toDouble())) {
-      double relativeAltitude = (altitude - _min) / (_max - _min);
-      if (dashedAltitudes) {
-        double dashWidth = 4, dashSpace = 5, startX = 0;
-        final paint = Paint()
-          ..color = dashedAltitudesColor ?? Colors.grey
-          ..strokeWidth = 1;
-        // Paint
-        while (startX < size.width) {
-          canvas.drawLine(
-              Offset(lbPadding.dx + startX,
-                  _getYForAltitude(relativeAltitude, size)),
-              Offset(lbPadding.dx + startX + dashWidth,
-                  _getYForAltitude(relativeAltitude, size)),
-              paint);
-          startX += dashWidth + dashSpace;
-        }
-      }
+        (i) => axisStep * i + _min)) {
+      final double relativeAltitude = (altitude - _min) / (_max - _min);
+      final double y = _getYForAltitude(relativeAltitude, size);
+
+      if (dashedAltitudes) _drawDashedAltitudeLine(canvas, size, y);
 
       if (scaleAltitudesMarks) {
-        canvas.drawLine(
-            Offset(lbPadding.dx, _getYForAltitude(relativeAltitude, size)),
-            Offset(lbPadding.dx + 10, _getYForAltitude(relativeAltitude, size)),
-            axisPaint);
+        canvas.drawLine(Offset(lbPadding.dx, y),
+            Offset(lbPadding.dx + _kAltitudeMarkLength, y), axisPaint);
       }
 
       // Paint altitudes text (Eg. 2600 ft)
@@ -439,20 +527,67 @@ class _ElevationPainter extends CustomPainter {
           text: TextSpan(
               style: scaleTextStyleOrDefault,
               text:
-                  '${altitude.toInt().toString()} ${unit == LENGTH.meters ? "m" : "ft"}'),
+                  '${altitude.toInt()} ${unit == LENGTH.meters ? "m" : "ft"}'),
           textDirection: TextDirection.ltr)
         ..layout()
-        ..paint(
-            canvas,
-            Offset(
-                0,
-                _getYForAltitude(relativeAltitude, size) -
-                    scaleTextStyleOrDefault.fontSize!.toDouble()));
+        ..paint(canvas, Offset(0, y - scaleTextStyleOrDefault.fontSize!));
     }
 
     if (altitudeScaleLineVisible) {
       canvas.drawLine(Offset(lbPadding.dx, 0),
           Offset(lbPadding.dx, size.height - lbPadding.dy), axisPaint);
+    }
+  }
+
+  void _drawDashedAltitudeLine(Canvas canvas, Size size, double y) {
+    final paint = Paint()
+      ..color = dashedAltitudesColor ?? Colors.grey
+      ..strokeWidth = 1;
+
+    double startX = 0;
+    while (startX < size.width) {
+      canvas.drawLine(Offset(lbPadding.dx + startX, y),
+          Offset(lbPadding.dx + startX + _kDashWidth, y), paint);
+      startX += _kDashWidth + _kDashSpace;
+    }
+  }
+
+  void _drawRidgeStroke(Canvas canvas, List<Path> ridgePaths) {
+    final ElevationStroke? stroke = this.stroke;
+    if (stroke == null) return;
+
+    final paint = Paint()
+      ..color = stroke.color
+      ..strokeWidth = stroke.width
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke;
+
+    for (final Path ridge in ridgePaths) {
+      canvas.drawPath(ridge, paint);
+    }
+  }
+
+  void _drawMarkers(Canvas canvas, Size size) {
+    final ElevationMarkers? markers = this.markers;
+    if (markers == null) return;
+
+    final fillPaint = Paint()
+      ..color = markers.fillColor
+      ..style = PaintingStyle.fill;
+    final edgePaint = Paint()
+      ..color = markers.strokeColor
+      ..strokeWidth = markers.strokeWidth
+      ..style = PaintingStyle.stroke;
+
+    for (final int pointIndex in markers.pointIndices) {
+      if (pointIndex < 0 || pointIndex >= _relativeAltitudes.length) continue;
+
+      final Offset center = Offset(pointIndex * widthOffset + lbPadding.dx,
+          _getYForAltitude(_relativeAltitudes[pointIndex], size));
+
+      canvas.drawCircle(center, markers.radius, fillPaint);
+      canvas.drawCircle(center, markers.radius, edgePaint);
     }
   }
 
@@ -462,11 +597,35 @@ class _ElevationPainter extends CustomPainter {
         paintColor != oldDelegate.paintColor ||
         parameter != oldDelegate.parameter ||
         parametersColors != oldDelegate.parametersColors ||
-        unit != oldDelegate.unit;
+        unit != oldDelegate.unit ||
+        scaleColor != oldDelegate.scaleColor ||
+        scaleTextStyle != oldDelegate.scaleTextStyle ||
+        dashedAltitudesColor != oldDelegate.dashedAltitudesColor ||
+        showAltitudeScale != oldDelegate.showAltitudeScale ||
+        stroke != oldDelegate.stroke ||
+        markers != oldDelegate.markers ||
+        totalDistanceLabel != oldDelegate.totalDistanceLabel;
   }
 
-  double _getYForAltitude(double altitude, Size size) =>
-      size.height - altitude * size.height - lbPadding.dy;
+  /// Room kept above the highest point for what is drawn on the ridge itself,
+  /// which the canvas would otherwise clip in half.
+  double get _topInset {
+    final ElevationMarkers? markers = this.markers;
+    final double strokeReach = (stroke?.width ?? 0) / 2;
+    final double markerReach =
+        markers == null ? 0 : markers.radius + markers.strokeWidth / 2;
+
+    return max(strokeReach, markerReach);
+  }
+
+  /// The band the track is drawn in: under whatever sits on the ridge, above
+  /// the room the distance labels need. The highest point used to land on
+  /// `-lbPadding.dy`, off the canvas, and got clipped away.
+  double _getYForAltitude(double altitude, Size size) {
+    final double band = size.height - _topInset - lbPadding.dy;
+
+    return _topInset + (1 - altitude) * band;
+  }
 
   ElevationPoint? getPointFromPosition(double position) {
     int index = ((position - lbPadding.dx) / widthOffset).round();
@@ -669,4 +828,54 @@ class ElevationGradientColors {
       if (gt15 != null) "Pentes >15%": gt15!,
     };
   }
+}
+
+/// The line drawn on the ridge of the elevation graph, over the filled area.
+class ElevationStroke {
+  const ElevationStroke({
+    required this.color,
+    this.width = _kDefaultStrokeWidth,
+  });
+
+  final Color color;
+  final double width;
+
+  @override
+  bool operator ==(Object other) =>
+      other is ElevationStroke && other.color == color && other.width == width;
+
+  @override
+  int get hashCode => Object.hash(color, width);
+}
+
+/// Round dots pinned on the ridge, at the given indexes of the point list.
+/// Out of range indexes are ignored rather than thrown, so a caller may pass
+/// the points of interest of a track without checking the track first.
+class ElevationMarkers {
+  const ElevationMarkers({
+    required this.pointIndices,
+    required this.fillColor,
+    required this.strokeColor,
+    this.radius = _kDefaultMarkerRadius,
+    this.strokeWidth = _kDefaultMarkerStrokeWidth,
+  });
+
+  final List<int> pointIndices;
+  final Color fillColor;
+  final Color strokeColor;
+  final double radius;
+  final double strokeWidth;
+
+  @override
+  bool operator ==(Object other) =>
+      other is ElevationMarkers &&
+      listEquals(other.pointIndices, pointIndices) &&
+      other.fillColor == fillColor &&
+      other.strokeColor == strokeColor &&
+      other.radius == radius &&
+      other.strokeWidth == strokeWidth;
+
+  @override
+  int get hashCode => Object.hash(Object.hashAll(pointIndices), fillColor,
+      strokeColor, radius, strokeWidth);
 }
